@@ -367,22 +367,7 @@ Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize)
 			//cout << w * *inData++ / avg_A << endl;
 			*outData++ = 1.0 - w * (*inData++ / avg_A);
 
-			/*
-			pix[0] = *srcData++;
-			pix[1] = *srcData++;
-			pix[2] = *srcData++;
-			float pixTot = (pix[0] + pix[1] + pix[2]) / 3.0;
-			//transmission.at<float>(k, l) = 1 - w*(*inData++ / avg_A);
-			//cout << *inData << endl;
-			*outData++ = 1.0 - w * (*inData++ / avg_A);
-			float pixFab = fabs(pixTot - avg_A);
-			//cout << pixFab << endl;
-			if (pixFab < valve) {
-				//cout << (gain + *outData) / ga
-				in << endl;
-				*outData += (gain + *outData) / gain;
-			}
-			*/
+	
 		}
 	}
 	imshow("t", transmission);
