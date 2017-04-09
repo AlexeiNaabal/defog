@@ -20,19 +20,33 @@ Mat minFilter(Mat srcImage, int kernelSize);
 void makeDepth32f(Mat& source, Mat& output);
 void guidedFilter(Mat& source, Mat& guided_image, Mat& output, int radius, float epsilon);
 Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize);
-Mat recover(Mat& srcimg, Mat& t, int *array, int windowsize);
+Mat recover(Mat& srcimg, Mat& t, float *array, int windowsize);
 
 int main() {
-	string name = "land";
+	char loc[100];
+	double scale = 1.0;
+	string name = "forest";
 	clock_t start, finish;
 	double duration;
+	cout << "A defog program" << endl
+		<< "realized by lya" << endl
+		<< "------------------------" << endl
+		<< "please input image location in absolute location manner, including image format: " << endl;
+	cin.getline(loc, 100);
+	cout << endl << "please input file rescale ratio, between 0.1 and 1.0: " << endl;
+	cin >> scale;
 	//read the image
-	Mat image = imread("c:/Users/Admin/documents/visual studio 2015/Projects/defog/" + name + ".jpg");
+	for (int i = 0; i < strlen(loc); ++i) {
+		if (loc[i] == '\\') {
+			loc[i] = '/';
+		}
+	}
+	cout << loc << endl;
+	Mat image = imread(loc);
 	Mat resizedImage;
 	int originRows = image.rows;
 	int originCols = image.cols;
 
-	double scale = 1.0;
 
 	if (scale < 1.0) {
 		resize(image, resizedImage, Size(originCols * scale, originRows * scale));
@@ -51,28 +65,6 @@ int main() {
 	int kernelSize = 15 ? max((rows * 0.01), (cols * 0.01)) : 15 < max((rows * 0.01), (cols * 0.01));
 	//int kernelSize = 15;
 	int parse = kernelSize / 2;
-	/*
-	Mat parseImage;
-	copyMakeBorder(convertImage, parseImage, parse, parse, parse, parse, BORDER_REPLICATE);
-	vector<Mat> parseImageVector(3);
-	split(parseImage, parseImageVector);
-
-	Mat darkChannel(rows, cols, CV_32FC1);
-	double minPixel, minTmp;
-	for (unsigned int r = 0; r < rows; r++) {
-		uchar *pt = darkChannel.ptr<uchar>(r);
-		for (unsigned int c = 0; c < cols; c++) {
-			minPixel = 1.0;
-			for (vector<Mat>::iterator it = parseImageVector.begin(); it != parseImageVector.end(); it++) {
-				Mat ROI(*it, Rect(c, r, kernelSize, kernelSize));
-				minMaxLoc(ROI, &minTmp);
-				minPixel = min(minPixel, minTmp);
-			}
-			
-			darkChannel.at<float>(r, c) = float(minPixel);
-		}
-	}
-	*/
 	Mat darkChannel(rows, cols, CV_8UC1);
 	Mat normalDark(rows, cols, CV_32FC1);
 	int nr = rows;
@@ -97,26 +89,6 @@ int main() {
 		}
 	}
 	darkChannel = minFilter(darkChannel, kernelSize);
-	//cout << darkChannel.size() << endl;
-	/*
-	Mat parseImage;
-	copyMakeBorder(image, parseImage, parse, parse, parse, parse, BORDER_REPLICATE);
-	vector<Mat> parseImageVector(3);
-	split(parseImage, parseImageVector);
-	double minPixel, minTmp;
-	for (unsigned int r = 0; r < rows; r++) {
-		uchar *darkPtr = darkChannel.ptr<uchar>(r);
-		for (unsigned int c = 0; c < cols; c++) {
-			minPixel = 255;
-			for (vector<Mat>::iterator it = parseImageVector.begin(); it != parseImageVector.end(); it++) {
-				Mat ROI(*it, Rect(c, r, kernelSize, kernelSize));
-				minMaxLoc(ROI, &minTmp);
-				minPixel = std::min(minPixel, minTmp);
-			}
-			darkChannel.at<int>(r, c) = float(minPixel);
-		}
-	}
-	*/
 
 	imshow("darkChannel", darkChannel);
 	//waitKey(0);
@@ -193,9 +165,7 @@ int main() {
 	//求t与将t进行导向滤波
 	Mat trans = getTransmission_dark(convertImage, normalDark, A, kernelSizeTrans);
 	imshow("filtered t", trans);
-	waitKey(1);
-	system("pause");
-	Mat finalImage = recover(resizedImage, trans, A, kernelSize);
+	Mat finalImage = recover(convertImage, trans, tmp_A, kernelSize);
 	//
 	Mat resizedFinal;
 	if (scale < 1.0) {
@@ -215,7 +185,7 @@ int main() {
 	destroyAllWindows();
 	image.release();
 	resizedImage.release();
-	//convertImage.release();
+	convertImage.release();
 	darkChannel.release();
 	trans.release();
 	finalImage.release();
@@ -367,18 +337,16 @@ Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize)
 	Mat transmission(nr, nl, CV_32FC1);
 	cout << srcimg.type() << " " << darkimg.type() << endl;
 	//system("pause");
-	float gain = 20;
-	float valve = 2;
+
 	for (int k = 0; k<nr; k++) {
-		const float *srcData = srcimg.ptr<float>(k);
+		//const float *srcData = srcimg.ptr<float>(k);
 		const float* inData = darkimg.ptr<float>(k);
 		float* outData = transmission.ptr<float>(k);
 		float pix[3] = { 0 };
 		for (int l = 0; l<nl; l++)
 		{
-			//cout << w * *inData++ / avg_A << endl;
 			*outData++ = 1.0 - w * *inData++;
-
+			//cout << w * *inData++ / avg_A << endl;
 		}
 	}
 	imshow("t", transmission);
@@ -400,16 +368,13 @@ Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize)
 			float* outData = graymat_32F.ptr<float>(i);
 			for (int j = 0; j < nl; j++)
 				*outData++ = *inData++ / 255.0;
-				//graymat_32F.at<float>(i, j) = *inData++ / 255.0;
 		}
-		
 		guidedFilter(transmission, graymat_32F, trans, 6 * windowsize, 0.001);
 	}
-
 	return trans;
 }
 
-Mat recover(Mat& srcimg, Mat& t, int *array, int windowsize)
+Mat recover(Mat& srcimg, Mat& t, float *array, int windowsize)
 {
 //J(x) = (I(x) - A) / max(t(x), t0) + A;
 	//t.convertTo(t, CV_8UC1);
@@ -418,27 +383,9 @@ Mat recover(Mat& srcimg, Mat& t, int *array, int windowsize)
 	int nr = srcimg.rows, nl = srcimg.cols;
 	float tnow = t.at<float>(0, 0);
 	float t0 = 0.1;
-	Mat finalimg = Mat::zeros(nr, nl, CV_8UC3);
-	int val = 0;
-	/*
-	for (int i = 0; i<3; i++) {
-		for (int k = 0; k<nr ; k++) {
-			const float* inData = t.ptr<float>(k);  inData += radius;
-			const uchar* srcData = srcimg.ptr<uchar>(k);  srcData += radius * 3 + i;
-			uchar* outData = finalimg.ptr<uchar>(k);  outData += radius * 3 + i;
-			for (int l = radius; l<nl ; l++)
-			{
-				tnow = *inData++;
-				tnow = tnow>t0 ? tnow : t0;
-				val = (int)((*srcData - array[i]) / tnow + array[i]);
-				srcData += 3;
-				val = val<0 ? 0 : val;
-				*outData = val>255 ? 250 : val;
-				outData += 3;
-			}
-		}
-	}
-	*/
+	Mat finalimg = Mat::zeros(nr, nl, CV_32FC3);
+	float val = 0;
+
 	//Be aware that transmission is a grey image
 	//srcImg is a color image
 	//finalImg is a color image
@@ -449,8 +396,8 @@ Mat recover(Mat& srcimg, Mat& t, int *array, int windowsize)
 	cout << "trasmmision type is: " << t.type() << endl;
 	for (unsigned int r = 0; r < nr; r++) {
 		const float* transPtr = t.ptr<float>(r);
-		const uchar* srcPtr = srcimg.ptr<uchar>(r);
-		uchar* outPtr = finalimg.ptr<uchar>(r);
+		const float* srcPtr = srcimg.ptr<float>(r);
+		float* outPtr = finalimg.ptr<float>(r);
 		for (unsigned int c = 0; c < nl; c++) {
 			//transmission image is grey, so only need 
 			//to move once per calculation, using index 
@@ -461,13 +408,12 @@ Mat recover(Mat& srcimg, Mat& t, int *array, int windowsize)
 				//so to calculate every color channel per pixel
 				//move the ptr once after one calculation.
 				//after 3 times move, calculation for a pixel is done
-				val = max((int)((*srcPtr++ - array[i]) / tnow + array[i]), 0);
+				val = (*srcPtr++ - array[i]) / tnow + array[i];
 				//srcPtr++;
-				*outPtr++ = std::min(val, 240);
+				*outPtr++ = val + 10 / 255.0;
 			}
 		}
 	}
-	
 	cout << finalimg.size() << endl;
 	return finalimg;
 }
