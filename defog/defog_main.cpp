@@ -167,6 +167,8 @@ int main() {
 	}
 	//cout << endl;
 
+	//暗通道归一化操作（除A）
+	//(I / A)
 	float tmp_A[3];
 	tmp_A[0] = A[0] / 255.0;
 	tmp_A[1] = A[1] / 255.0;
@@ -184,9 +186,11 @@ int main() {
 			*outData++ = min;
 		}
 	}
+	//暗通道最小滤波
 	normalDark = minFilter(normalDark, kernelSize);
 	imshow("normal",normalDark);
 	int kernelSizeTrans = std::max(3, kernelSize);
+	//求t与将t进行导向滤波
 	Mat trans = getTransmission_dark(convertImage, normalDark, A, kernelSizeTrans);
 	imshow("filtered t", trans);
 	waitKey(1);
@@ -347,8 +351,16 @@ Mat guidedFilterN(Mat &srcImg, Mat &guidedImg, int radius, double epsilon) {
 */
 Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize)
 {
+	//t = 1 - omega * minfilt(I / A);
+	float avg_A;
+	//convertImage是一个CV_32FC3的图
 	//float avg_A = (array[0] + array[1] + array[2]) / (3.0 * 255.0);
-	float avg_A = (array[0] + array[1] + array[2]) / 3.0;
+	if (srcimg.type() % 8 == 0) {
+		avg_A = (array[0] + array[1] + array[2]) / 3.0;
+	}
+	else {
+		avg_A = (array[0] + array[1] + array[2]) / (3.0 * 255.0);
+	}
 	float w = 0.95;
 	int radius = windowsize / 2;
 	int nr = srcimg.rows, nl = srcimg.cols;
@@ -365,9 +377,8 @@ Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize)
 		for (int l = 0; l<nl; l++)
 		{
 			//cout << w * *inData++ / avg_A << endl;
-			*outData++ = 1.0 - w * (*inData++ / avg_A);
+			*outData++ = 1.0 - w * *inData++;
 
-	
 		}
 	}
 	imshow("t", transmission);
