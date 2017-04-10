@@ -41,7 +41,6 @@ int main() {
 			loc[i] = '/';
 		}
 	}
-	cout << loc << endl;
 	Mat image = imread(loc);
 	Mat resizedImage;
 	int originRows = image.rows;
@@ -71,6 +70,7 @@ int main() {
 	int nl = cols;
 	float b, g, r;
 	start = clock();
+	cout << "generating dark channel image." << endl;
 	if (resizedImage.isContinuous()) {
 		nl = nr * nl;
 		nr = 1;
@@ -91,10 +91,12 @@ int main() {
 	darkChannel = minFilter(darkChannel, kernelSize);
 
 	imshow("darkChannel", darkChannel);
+	cout << "dark channel generated." << endl;
 	//waitKey(0);
 
 	//estimate Airlight
 	//开一个结构体数组存暗通道，再sort，取最大0.1%，利用结构体内存储的原始坐标在原图中取点，perfect
+	cout << "estimating airlight." << endl;
 	rows = darkChannel.rows, cols = darkChannel.cols;
 	int pixelTot = rows * cols * 0.001;
 	int *A = new int[3];
@@ -137,10 +139,12 @@ int main() {
 		A[i] = resizedImage.at<Vec3b>(max_x, max_y)[i];
 		//cout << A[i] << " ";
 	}
+	cout << "airlight estimated as: " << A[0] << ", " << A[1] << ", " << A[2] << endl;
 	//cout << endl;
 
 	//暗通道归一化操作（除A）
 	//(I / A)
+	cout << "start normalization of input image I." << endl;
 	float tmp_A[3];
 	tmp_A[0] = A[0] / 255.0;
 	tmp_A[1] = A[1] / 255.0;
@@ -158,15 +162,21 @@ int main() {
 			*outData++ = min;
 		}
 	}
+	cout << "normalization finished." << endl << "generating relative dark channel image." << endl;
 	//暗通道最小滤波
 	normalDark = minFilter(normalDark, kernelSize);
+	cout << "dark channel image generated." << "start estimating transmission and guided image filtering." << endl;
 	imshow("normal",normalDark);
 	int kernelSizeTrans = std::max(3, kernelSize);
 	//求t与将t进行导向滤波
+
 	Mat trans = getTransmission_dark(convertImage, normalDark, A, kernelSizeTrans);
+	cout << "tansmission estimated and guided filtered." << endl;
 	imshow("filtered t", trans);
+	cout << "start recovering." << endl;
 	Mat finalImage = recover(convertImage, trans, tmp_A, kernelSize);
 	//
+	cout << "recovering finished." << endl;
 	Mat resizedFinal;
 	if (scale < 1.0) {
 		resize(finalImage, resizedFinal, Size(originCols, originRows));
@@ -335,7 +345,7 @@ Mat getTransmission_dark(Mat& srcimg, Mat& darkimg, int *array, int windowsize)
 	int radius = windowsize / 2;
 	int nr = srcimg.rows, nl = srcimg.cols;
 	Mat transmission(nr, nl, CV_32FC1);
-	cout << srcimg.type() << " " << darkimg.type() << endl;
+	//cout << srcimg.type() << " " << darkimg.type() << endl;
 	//system("pause");
 
 	for (int k = 0; k<nr; k++) {
@@ -378,7 +388,7 @@ Mat recover(Mat& srcimg, Mat& t, float *array, int windowsize)
 {
 //J(x) = (I(x) - A) / max(t(x), t0) + A;
 	//t.convertTo(t, CV_8UC1);
-	cout << t.channels() << " " << t.size() << endl;
+	//cout << t.channels() << " " << t.size() << endl;
 	int radius = windowsize / 2;
 	int nr = srcimg.rows, nl = srcimg.cols;
 	float tnow = t.at<float>(0, 0);
@@ -391,9 +401,9 @@ Mat recover(Mat& srcimg, Mat& t, float *array, int windowsize)
 	//finalImg is a color image
 	//Mat store color image a pixel per 3 position
 	//store grey image a pixel per 1 position
-	cout << "recovering phase:\n";
-	cout << "srcimg type is: " << srcimg.type() << endl;
-	cout << "trasmmision type is: " << t.type() << endl;
+	//cout << "recovering phase:\n";
+	//cout << "srcimg type is: " << srcimg.type() << endl;
+	//cout << "trasmmision type is: " << t.type() << endl;
 	for (unsigned int r = 0; r < nr; r++) {
 		const float* transPtr = t.ptr<float>(r);
 		const float* srcPtr = srcimg.ptr<float>(r);
